@@ -1,5 +1,10 @@
 # DocuBot
 
+
+## TF Summary
+The core concept students need to understand is that retrieval and generation are separate. They are separate steps that eventually lead to the desired outcome. Another things is that returning whole documents is worse than returning paragraphs, since returning whole documents will make finding the answer to queries harder. Students are most likely to struggle with building the `build_index` function, since it requires thinking about data structures which is slightly differenct than writing a for loop. AI was helpful explaining design choices and their  tradeoffs. For example, why retrieving paragraph in chunks instead of whole documents reduce the score magnitudes. Ai was misleading by  jumping into more complex solutions when the student isn't familar with what the  AI is doing. For when student is building out the major features like `build_index`, `score_document`, and `retrieve`, they will experience bugs, which can be resolved by asking the students to inspect their own data structures.
+
+
 DocuBot is a small documentation assistant that helps answer developer questions about a codebase.  
 It can operate in three different modes:
 
