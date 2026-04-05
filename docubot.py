@@ -20,10 +20,13 @@ class DocuBot:
         self.llm_client = llm_client
 
         # Load documents into memory
-        self.documents = self.load_documents()  # List of (filename, text)
+        self.documents = self.load_documents()  # List of (filename, full_text)
 
-        # Build a retrieval index (implemented in Phase 1)
-        self.index = self.build_index(self.documents)
+        # Split documents into paragraph-level chunks for finer retrieval
+        self.chunks = self.chunk_documents(self.documents)  # List of (filename, chunk_text)
+
+        # Build a retrieval index over chunks
+        self.index = self.build_index(self.chunks)
 
     # -----------------------------------------------------------
     # Document Loading
@@ -43,6 +46,21 @@ class DocuBot:
                 filename = os.path.basename(path)
                 docs.append((filename, text))
         return docs
+
+    def chunk_documents(self, documents):
+        """
+        Splits each document into paragraph-level chunks (split on blank lines).
+        Returns a flat list of (filename, chunk_text) tuples.
+        Skips empty or whitespace-only paragraphs.
+        """
+        chunks = []
+        for filename, text in documents:
+            paragraphs = text.split("\n\n")
+            for para in paragraphs:
+                stripped = para.strip()
+                if stripped:
+                    chunks.append((filename, stripped))
+        return chunks
 
     # -----------------------------------------------------------
     # Index Construction (Phase 1)
@@ -64,25 +82,49 @@ class DocuBot:
         ignore punctuation if needed.
         """
         index = {}
-        # TODO: implement simple indexing
+        for i, (_, text) in enumerate(documents):
+            for token in text.lower().split():
+                token = token.strip(".,!?;:\"'()[]")
+                if token:
+                    if token not in index:
+                        index[token] = []
+                    if i not in index[token]:
+                        index[token].append(i)
         return index
 
     # -----------------------------------------------------------
     # Scoring and Retrieval (Phase 1)
     # -----------------------------------------------------------
 
+    # Common words that appear everywhere and carry no signal
+    STOP_WORDS = {
+        "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+        "have", "has", "had", "do", "does", "did", "will", "would", "could",
+        "should", "may", "might", "shall", "can", "of", "in", "on", "at",
+        "to", "for", "with", "by", "from", "up", "about", "into", "through",
+        "and", "or", "but", "not", "if", "as", "it", "its", "this", "that",
+        "these", "those", "there", "their", "they", "what", "which", "who",
+        "how", "when", "where", "why", "any", "all", "some", "such", "no",
+        "more", "my", "your", "our", "his", "her",
+        # Domain-specific generics: every result is a "doc", so these carry no signal
+        "docs", "doc", "documentation",
+    }
+
     def score_document(self, query, text):
         """
-        TODO (Phase 1):
-        Return a simple relevance score for how well the text matches the query.
-
-        Suggested baseline:
-        - Convert query into lowercase words
-        - Count how many appear in the text
-        - Return the count as the score
+        Return a relevance score based on how many meaningful query words appear
+        in the text. Stop words are excluded so common words don't inflate scores.
         """
-        # TODO: implement scoring
-        return 0
+        text_lower = text.lower()
+        content_words = [
+            w.strip(".,!?;:\"'()[]<>/") for w in query.lower().split()
+            if w.strip(".,!?;:\"'()[]<>/") not in self.STOP_WORDS
+            and w.strip(".,!?;:\"'()[]<>/")
+        ]
+        if not content_words:
+            return 0
+        score = sum(1 for word in content_words if word in text_lower)
+        return score
 
     def retrieve(self, query, top_k=3):
         """
@@ -91,8 +133,32 @@ class DocuBot:
 
         Return a list of (filename, text) sorted by score descending.
         """
-        results = []
-        # TODO: implement retrieval logic
+        # Minimum score a chunk must reach to be considered meaningful evidence.
+        # Score is based on content words only (stop words excluded), so even
+        # score=1 means at least one meaningful term matched.
+        MIN_SCORE = 1
+
+        # Use only content words to look up candidate chunks in the index
+        query_tokens = [
+            t.strip(".,!?;:\"'()[]<>/") for t in query.lower().split()
+            if t.strip(".,!?;:\"'()[]<>/") not in self.STOP_WORDS
+            and t.strip(".,!?;:\"'()[]<>/")
+        ]
+        candidate_indices = set()
+        for token in query_tokens:
+            if token in self.index:
+                candidate_indices.update(self.index[token])
+
+        # Score each candidate chunk; apply guardrail threshold
+        scored = []
+        for i, (filename, text) in enumerate(self.chunks):
+            if i in candidate_indices:
+                score = self.score_document(query, text)
+                if score >= MIN_SCORE:
+                    scored.append((score, filename, text))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        results = [(filename, text) for _, filename, text in scored]
         return results[:top_k]
 
     # -----------------------------------------------------------
