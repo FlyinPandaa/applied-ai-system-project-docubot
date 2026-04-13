@@ -10,11 +10,13 @@ This document locks **provisional** values for the public SaaS MVP described in 
 
 ## Rate limits (provisional)
 
-| Surface | Window | Limit | Notes |
-|--------|--------|-------|--------|
-| `POST /api/retrieve` | 1 hour | **120** requests per IP | Implemented in `web/src/lib/rate-limit.ts` as `RETRIEVE_RATE_LIMIT`. Returns **429** with `Retry-After`. |
-| Query body | per request | **4000** characters max | Implemented in `web/src/app/api/retrieve/route.ts`. |
-| `topK` | per request | **1–20** (default **3**) | Prevents huge payloads. |
+
+| Surface              | Window      | Limit                    | Notes                                                                                                    |
+| -------------------- | ----------- | ------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `POST /api/retrieve` | 1 hour      | **120** requests per IP  | Implemented in `web/src/lib/rate-limit.ts` as `RETRIEVE_RATE_LIMIT`. Returns **429** with `Retry-After`. |
+| Query body           | per request | **4000** characters max  | Implemented in `web/src/app/api/retrieve/route.ts`.                                                      |
+| `topK`               | per request | **1–20** (default **3**) | Prevents huge payloads.                                                                                  |
+
 
 ## Future (M2+) — hybrid Gemini keys
 
@@ -26,3 +28,4 @@ This document locks **provisional** values for the public SaaS MVP described in 
 - Put limits in **environment variables** for tuning without redeploying code.
 - Add **CAPTCHA** or **signed session** if automated abuse is observed.
 - Document limits in the **public FAQ** and API error messages.
+

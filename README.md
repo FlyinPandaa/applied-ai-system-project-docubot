@@ -1,16 +1,21 @@
-# DocuBot — Documentation Q&A (RAG Learning Lab)
+# DocuBot - Documentation Q&A (RAG Learning Lab)
 
 ## Original project context
 
-This repository extends **DocuBot**, the **CodePath AI 110 “tinker” activity from Modules 1–3** (the applied documentation assistant lab). The original goal was to build intuition for **retrieval**, **indexing**, and **retrieval-augmented generation (RAG)** by comparing three approaches: asking an LLM without retrieval, returning evidence snippets only, and combining retrieval with an LLM grounded on snippets. The starter project uses plain Markdown docs (API, auth, database, setup) so you can experiment without running a real backend.
+This repository extends **DocuBot**, the CodePath AI 110 lab from Modules 1-3.  
+The goal is to learn **retrieval**, **indexing**, and **RAG** by comparing three modes: LLM-only, retrieval-only, and RAG.  
+The project uses local Markdown docs (`docs/`) so you can test ideas without a real backend.
 
 ## Title and summary
 
-**DocuBot** is a small system that answers developer-style questions about a **local documentation corpus**. It matters because it demonstrates a practical pattern for **grounding** language models: first **find** the right evidence, then **generate** an answer with explicit constraints, instead of relying on the model’s memory alone.
+**DocuBot** answers developer-style questions from a local docs set.  
+It shows a practical pattern: **retrieve evidence first, then generate** an answer.
 
 ## Architecture overview
 
-The system has three logical layers: **corpus + chunking**, **retrieval**, and **generation** (optional). A separate **evaluation** script scores retrieval quality against simple “expected file” rules. Humans stay in the loop by choosing a mode in the CLI, reading outputs, and interpreting hit rates.
+The system has three parts: **corpus + chunking**, **retrieval**, and optional **generation**.  
+A separate script (`evaluation.py`) checks retrieval quality against simple expected-source rules.  
+People stay in the loop by running the CLI and checking whether answers match the docs.
 
 ### System diagram
 
@@ -54,40 +59,68 @@ flowchart LR
 
 
 
-**Data flow (input → process → output):**
+**Data flow (input -> process -> output):**
 
 1. **Input:** questions (typed or from `dataset.py` sample queries) plus Markdown/text files under `docs/`.
-2. **Process:** load files → split into paragraph chunks → build a lightweight inverted index → retrieve top snippets via token overlap scoring (with stop-word filtering).
-3. **Output:** either **snippets only** (retrieval mode) or a **Gemini answer** constrained to those snippets (RAG mode). A **naive LLM** mode sends the question to Gemini without attaching the corpus in the current prompt implementation (useful as a contrast point for the activity).
+2. **Process:** load files -> split into paragraph chunks -> build a lightweight inverted index -> retrieve top snippets using token overlap (with stop-word filtering).
+3. **Output:** either **snippets only** (retrieval mode) or a **Gemini answer** that must use retrieved snippets (RAG mode).  
+   In naive mode, the current prompt path asks Gemini without attaching corpus text.
 
 **Where humans and testing fit in:**
 
-- **Humans:** run `main.py`, choose a mode, and judge whether answers are faithful to the docs; adjust prompts, scoring, or queries based on failure cases.
-- **Automated testing:** `python -m pytest tests/` runs golden retrieval checks (no API key), and `evaluation.py` reports a **hit rate** over `SAMPLE_QUERIES` using `EXPECTED_SOURCES`.
+- **Humans:** run `main.py`, choose a mode, and check whether answers match the docs.
+- **Automated testing:** `python -m pytest tests/` runs golden retrieval checks (no API key).  
+  `evaluation.py` reports a hit rate over `SAMPLE_QUERIES` using `EXPECTED_SOURCES`.
 
-**Web app (M0–M1):** `web/` is a **Next.js** UI plus **retrieval-only** API (`POST /api/retrieve`) that mirrors the Python scoring logic in TypeScript. The bundled corpus lives under `web/content/docs` (kept in sync with the repo `docs/` Markdown files). Operational defaults and limits are documented under `web-spec/`. CI runs `**npm run test`**, `**npm run lint`**, and `**npm run build**` in `web/` (see `.github/workflows/docubot-web-ci.yml`).
+- Next.js UI
+- Retrieval-only API (`POST /api/retrieve`)
+- TypeScript retrieval logic that mirrors Python behavior
+
+Bundled docs for the web app are in `web/content/docs`.
+
+Operational limits and guardrails are in `web-spec/`.
+
+CI for `web/` runs:
+
+- `npm run test`
+- `npm run lint`
+- `npm run build`
+
+See `.github/workflows/docubot-web-ci.yml`.
 
 ## Setup instructions
 
 ### Python CLI (primary)
 
 1. Install dependencies:
-  ```bash
-   pip install -r requirements.txt
-  ```
-2. Copy environment template and add your key (needed for LLM modes **1** and **3**):
-  ```bash
-   cp .env.example .env
-  ```
-   Set `GEMINI_API_KEY=your_key_here` inside `.env`.
-3. Run the CLI:
-  ```bash
-   python main.py
-  ```
-4. Choose a mode:
-  - **1:** Naive LLM (Gemini; no retrieval in the prompt path as implemented in `llm_client.py`)
-  - **2:** Retrieval only (no API key required)
-  - **3:** RAG (retrieve snippets, then Gemini answers using only those snippets)
+
+```bash
+pip install -r requirements.txt
+```
+
+2. Copy env template:
+
+```bash
+cp .env.example .env
+```
+
+3. Set your Gemini key in `.env` (needed for modes 1 and 3):
+
+```env
+GEMINI_API_KEY=your_key_here
+```
+
+4. Run the CLI:
+
+```bash
+python main.py
+```
+
+5. Choose a mode:
+
+- **1:** Naive LLM
+- **2:** Retrieval only
+- **3:** RAG
 
 ### Automated retrieval tests (optional, no API key)
 
@@ -99,7 +132,7 @@ python -m pip install -r requirements-dev.txt
 python -m pytest tests/ -v
 ```
 
-On Windows, if `python` is not on your PATH, use `py -3` instead (for example `py -3 -m pip install …` and `py -3 -m pytest …`).
+On Windows, if `python` is not on your PATH, use `py -3` (for example `py -3 -m pip install ...` and `py -3 -m pytest ...`).
 
 ### Retrieval evaluation (optional)
 
@@ -116,9 +149,9 @@ npm run test
 npm run dev
 ```
 
-- UI: `http://localhost:3000` — ask questions and inspect ranked snippets.
+- UI: `http://localhost:3000` - ask questions and inspect ranked snippets.
 - Health: `GET http://localhost:3000/api/health`
-- Retrieve: `POST http://localhost:3000/api/retrieve` with JSON body `{ "query": "…", "topK": 5 }`
+- Retrieve: `POST http://localhost:3000/api/retrieve` with JSON body `{ "query": "How do I connect to the database?", "topK": 5 }`
 
 Bundled docs ship in `web/content/docs`. To refresh from the Python corpus, copy `docs/*.md` into that folder.
 
@@ -128,37 +161,42 @@ Below are realistic examples based on the bundled `docs/` corpus and retrieval b
 
 ### 1) Retrieval-only (Mode 2)
 
-- **Input:** “Where is the auth token generated?”
-- **Output (shape):** Top snippets from `AUTH.md` (and sometimes `API_REFERENCE.md` when wording overlaps), showing the paragraph that names `generate_access_token` in `auth_utils.py` and the role of `AUTH_SECRET_KEY`.
+- **Input:** "Where is the auth token generated?"
+- **Output (shape):** Top snippets from `AUTH.md` (and sometimes `API_REFERENCE.md` if wording overlaps), including `generate_access_token` and `AUTH_SECRET_KEY`.
 
 ### 2) RAG (Mode 3)
 
-- **Input:** “What environment variables are required for authentication?”
-- **Output (shape):** A short Gemini answer that cites `AUTH.md` / `SETUP.md`, listing variables such as `AUTH_SECRET_KEY` and `TOKEN_LIFETIME_SECONDS`, and refusing if snippets lack evidence.
+- **Input:** "What environment variables are required for authentication?"
+- **Output (shape):** A short Gemini answer that cites `AUTH.md` and `SETUP.md`, lists variables like `AUTH_SECRET_KEY` and `TOKEN_LIFETIME_SECONDS`, and refuses when evidence is missing.
 
 ### 3) Failure case (why evaluation matters)
 
-- **Input:** “How does a client refresh an access token?”
-- **What can go wrong:** Lexical retrieval may surface `API_REFERENCE.md` hits first if query terms match route listings strongly; `evaluation.py` may mark this as a **miss** even though a human might still find the answer elsewhere in the corpus.
-- **Takeaway:** simple bag-of-words retrieval is a **baseline**, not a complete search product.
+- **Input:** "How does a client refresh an access token?"
+- **What can go wrong:** Lexical retrieval may rank `API_REFERENCE.md` too high when route terms overlap.  
+  `evaluation.py` may mark this as a miss even when a person can still find the answer in another file.
+- **Takeaway:** simple bag-of-words retrieval is a baseline, not a full search system.
 
 ## Design decisions
 
 - **Paragraph chunks instead of whole files:** smaller units improve precision for short factual questions and keep LLM context windows focused.
-- **Inverted index + overlap scoring:** easy to teach and fast for small corpora; trades away semantic understanding (no embeddings) for transparency and debuggability.
+- **Inverted index + overlap scoring:** easy to teach and fast for small corpora, but weaker on semantic matching (no embeddings).
 - **Stop-word filtering:** reduces score inflation from generic language shared across many sections.
-- **RAG prompt rules:** the Gemini prompt requires sticking to snippets and a verbatim “I do not know…” refusal to reduce confident hallucinations.
-- **Evaluator simplicity:** `EXPECTED_SOURCES` uses substring keys to approximate “correct” files so students can track progress without building a full IR test harness.
+- **RAG prompt rules:** Gemini must stick to snippets and use an explicit refusal when evidence is not enough.
+- **Simple evaluator:** `EXPECTED_SOURCES` uses substring keys so students can track progress without a large IR test harness.
 
 ## Testing summary
 
-**Proof (one line):** **5 / 5** `python -m pytest tests/` checks passed; the `evaluation.py` harness labels **5 / 8** sample queries as hits (~0.62); the stack did best on keyword‑specific questions and worst when **API vs auth docs shared vocabulary**; **off‑topic** questions return **no snippets** plus an “I do not know” style retrieval-only answer (no model in those tests).
+**Proof (one line):** **5 / 5** `pytest` checks passed.  
+`evaluation.py` reports **5 / 8** hits (~0.62).  
+It works best on specific keywords and struggles when API/auth wording overlaps.  
+Off-topic questions return no snippets and a refusal-style retrieval answer.
 
 **How reliability is measured**
 
-- **Automated tests:** `python -m pytest tests/` — golden retrieval cases (auth token → `AUTH.md`, users table → `DATABASE.md`, payment → empty), refusal text when there is no evidence, and a floor on `evaluation.py` hit rate (regressions fail in CI).
-- **Harness metric:** `python evaluation.py` — reports per-query hits against `EXPECTED_SOURCES` in `evaluation.py`.
-- **Human / peer review:** run `main.py` mode **2** or **3** and confirm answers match cited snippets (especially after changing prompts or scoring).
+- **Automated tests:** `python -m pytest tests/` checks golden retrieval cases and refusal behavior.  
+  It also enforces a minimum hit-rate floor so regressions fail in CI.
+- **Harness metric:** `python evaluation.py` reports per-query hits against `EXPECTED_SOURCES` in `evaluation.py`.
+- **Human / peer review:** run `main.py` mode **2** or **3** and confirm answers match cited snippets.
 
 ```bash
 # From repo root (folder containing requirements-dev.txt)
@@ -167,11 +205,24 @@ python -m pytest tests/ -v
 python evaluation.py
 ```
 
-- **Retrieval evaluation:** running `python evaluation.py` on the current code and `docs/` produced a **hit rate of 0.62** (5 / 8 sample queries matched the harness’s expected filenames in the top results). Strong matches included database connection questions and several auth and user-listing queries.
-- **What worked:** straightforward questions with distinctive keywords (for example database setup, explicit endpoint phrasing) tended to retrieve the right file quickly.
-- **What did not:** some queries with overlapping vocabulary across multiple docs (for example refresh-token wording competing with general API route lists) surfaced the wrong top file; the **payment processing** query correctly retrieved **no** snippets, illustrating the “no evidence” path.
-- **What I learned:** lexical retrieval is sensitive to **wording** and **document structure**; evaluation metrics depend heavily on how “expected” labels are defined.
+- **Retrieval evaluation:** `python evaluation.py` currently reports a **0.62** hit rate (5 / 8 queries).
+- **What worked:** straightforward questions with clear keywords often retrieved the right file.
+- **What did not:** queries with overlapping vocabulary sometimes ranked the wrong file first.  
+  The payment-processing query correctly returned no snippets.
+- **What I learned:** lexical retrieval is sensitive to wording and document structure.  
+  Evaluation numbers also depend on how expected labels are defined.
 
 ## Reflection
 
-This project reinforced that **retrieval and generation are separate concerns**: retrieval quality sets a ceiling on RAG trustworthiness. Building the index and scoring logic demanded careful thinking about **data structures** and **normalization** (tokens, punctuation, stop words). Using both **automated checks** and **human reading** helped catch cases where metrics and user satisfaction diverge. Overall, it clarified how small, inspectable systems can teach RAG end-to-end before jumping to embedding databases and production-scale observability.
+### What are the limitations or biases in your system?
+- One bias is answers are only as fair and complete as the markdown that is currently in the 'docs/'. Gaps, outdated API notes, or one-sided explanations become the truth for RAG. So it's important to make sure the docs provided are of high quality and updated. A way to nullify this flaw is to just omit the local docs, and ask the AI/model to find external documetations on website and answer the user's questions that way.
+
+### Could your AI be misused, and how would you prevent that?
+- A case of misuse would be treating DocuBot as a authoritative security or compliance advice. Also have to be careful of leaking internal docs if someone points Docubout at sensitive  files.
+
+### What surprised you while testing your AI's reliability?
+- Hit rate isn't exactly the only factor when trying to guage how useful a response is to the user. Also the retrieval can look "smart" of easy queries and also when Docubot failes when several docs share the same vocabulary (e.g. auth vs API  reference both mentioning  tokens and routes).
+
+### describe your collaboration with AI during this project. Identify one instance when the AI gave a helpful suggestion and one instance where its suggestion was flawed or incorrect.
+- AI was usefil while in the planning phase of the upgraded Docubot (e.g. edge cases and defining scope of the project). Something AI wasn't useful for is over-engineering such as jumping into embeddings and Vector DB before th simple  index works. This would add complexity to the project and hide bugs in the chunking and evaluation.
+
