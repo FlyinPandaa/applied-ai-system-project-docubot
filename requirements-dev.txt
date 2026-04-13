@@ -1,0 +1,2 @@
+# Minimal deps for automated retrieval tests (no Gemini).
+pytest>=8.0.0
